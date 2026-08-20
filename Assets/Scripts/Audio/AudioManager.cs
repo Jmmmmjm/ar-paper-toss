@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -24,6 +25,9 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip _scoreTier5MegaClip;
     [SerializeField] private AudioClip _newRecordClip;
 
+    [Header("Airplane Obstacle SFX")]
+    [SerializeField] private AudioClip _airplaneHitClip;
+
     [Header("Impact SFX")]
     [SerializeField] private AudioClip[] _impactClips;
 
@@ -38,6 +42,16 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip _menuOpenClip;
     [SerializeField] private AudioClip _menuCloseClip;
 
+    [Header("Background Music (BGM)")]
+    [SerializeField] private AudioClip _menuBGMClip;
+    [SerializeField] private AudioClip _battleBGMClip;
+    [SerializeField] private float _menuBGMVolume = 0.25f;
+    [SerializeField] private float _battleBGMVolume = 0.28f;
+    [SerializeField] private bool _autoPlayMenuBGMOnStart = true;
+
+    private AudioSource _bgmSource;
+    private Coroutine _bgmFadeCoroutine;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -47,11 +61,21 @@ public class AudioManager : MonoBehaviour
         }
         Instance = this;
 
+        EnsureBGMSource();
         InitializeSources();
+    }
+
+    private void Start()
+    {
+        if (_autoPlayMenuBGMOnStart && _menuBGMClip != null)
+        {
+            PlayMenuBGM(false);
+        }
     }
 
     private void OnEnable()
     {
+        EnsureBGMSource();
         InitializeSources();
 
         PaperBall.OnBallLaunched += HandleBallLaunched;
@@ -59,6 +83,7 @@ public class AudioManager : MonoBehaviour
         PlacementController.OnTrashCanPlaced += HandleCanPlaced;
         ScoreTrigger.OnSuccessfulScore += HandleScore;
         SettingsManager.OnPauseStateChanged += HandlePauseStateChanged;
+        SettingsManager.OnSFXToggled += HandleSFXToggled;
     }
 
     private void OnDisable()
@@ -68,6 +93,15 @@ public class AudioManager : MonoBehaviour
         PlacementController.OnTrashCanPlaced -= HandleCanPlaced;
         ScoreTrigger.OnSuccessfulScore -= HandleScore;
         SettingsManager.OnPauseStateChanged -= HandlePauseStateChanged;
+        SettingsManager.OnSFXToggled -= HandleSFXToggled;
+    }
+
+    private void HandleSFXToggled(bool enabled)
+    {
+        if (_bgmSource != null)
+        {
+            _bgmSource.mute = !enabled;
+        }
     }
 
     private void InitializeSources()
@@ -183,6 +217,19 @@ public class AudioManager : MonoBehaviour
         PlayRandomClip(_impactClips, vol, 0.9f, 1.15f);
     }
 
+    public void PlayAirplaneDeflectSound()
+    {
+        if (_airplaneHitClip != null)
+        {
+            float pitch = Random.Range(1.05f, 1.22f);
+            PlayClip(_airplaneHitClip, 1.0f, pitch);
+        }
+        else
+        {
+            PlayImpactSound(2.2f);
+        }
+    }
+
     public void PlayButtonClick()
     {
         PlayClip(_buttonClickClip, 0.95f, 1.0f);
@@ -233,5 +280,119 @@ public class AudioManager : MonoBehaviour
         }
 
         return _sources != null && _sources.Count > 0 ? _sources[0] : null;
+    }
+
+    public void PlayMenuBGM(bool fade = true)
+    {
+        if (_menuBGMClip == null) return;
+        PlayBGMTrack(_menuBGMClip, _menuBGMVolume, fade);
+    }
+
+    public void PlayBattleBGM(bool fade = true)
+    {
+        if (_battleBGMClip == null) return;
+        PlayBGMTrack(_battleBGMClip, _battleBGMVolume, fade);
+    }
+
+    public void StopBGM(bool fade = true)
+    {
+        if (_bgmSource == null || !_bgmSource.isPlaying) return;
+
+        if (_bgmFadeCoroutine != null) StopCoroutine(_bgmFadeCoroutine);
+        if (fade && gameObject.activeInHierarchy)
+        {
+            _bgmFadeCoroutine = StartCoroutine(FadeOutBgmRoutine(0.4f));
+        }
+        else
+        {
+            _bgmSource.Stop();
+        }
+    }
+
+    private void PlayBGMTrack(AudioClip clip, float targetVol, bool fade)
+    {
+        if (clip == null) return;
+        EnsureBGMSource();
+
+        if (_bgmSource.clip == clip && _bgmSource.isPlaying)
+        {
+            return; // Already playing this track
+        }
+
+        if (_bgmFadeCoroutine != null) StopCoroutine(_bgmFadeCoroutine);
+
+        if (fade && _bgmSource.isPlaying && gameObject.activeInHierarchy)
+        {
+            _bgmFadeCoroutine = StartCoroutine(FadeToBgmRoutine(clip, targetVol, 0.5f));
+        }
+        else
+        {
+            _bgmSource.clip = clip;
+            bool soundEnabled = SettingsManager.Instance == null || SettingsManager.Instance.SFXEnabled;
+            _bgmSource.volume = soundEnabled ? targetVol : 0f;
+            _bgmSource.mute = !soundEnabled;
+            _bgmSource.Play();
+        }
+    }
+
+    private System.Collections.IEnumerator FadeToBgmRoutine(AudioClip newClip, float targetVol, float duration)
+    {
+        float startVol = _bgmSource.volume;
+        float elapsed = 0f;
+
+        // Fade out
+        while (elapsed < duration * 0.5f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _bgmSource.volume = Mathf.Lerp(startVol, 0f, elapsed / (duration * 0.5f));
+            yield return null;
+        }
+
+        _bgmSource.Stop();
+        _bgmSource.clip = newClip;
+        _bgmSource.Play();
+
+        bool soundEnabled = SettingsManager.Instance == null || SettingsManager.Instance.SFXEnabled;
+        float finalVol = soundEnabled ? targetVol : 0f;
+        _bgmSource.mute = !soundEnabled;
+
+        // Fade in
+        elapsed = 0f;
+        while (elapsed < duration * 0.5f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _bgmSource.volume = Mathf.Lerp(0f, finalVol, elapsed / (duration * 0.5f));
+            yield return null;
+        }
+
+        _bgmSource.volume = finalVol;
+    }
+
+    private System.Collections.IEnumerator FadeOutBgmRoutine(float duration)
+    {
+        float startVol = _bgmSource.volume;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _bgmSource.volume = Mathf.Lerp(startVol, 0f, elapsed / duration);
+            yield return null;
+        }
+
+        _bgmSource.Stop();
+        _bgmSource.volume = startVol;
+    }
+
+    private void EnsureBGMSource()
+    {
+        if (_bgmSource == null)
+        {
+            _bgmSource = gameObject.AddComponent<AudioSource>();
+            _bgmSource.loop = true;
+            _bgmSource.playOnAwake = false;
+            _bgmSource.spatialBlend = 0f; // 2D Stereo
+            _bgmSource.priority = 0; // Highest priority so BGM never gets voice-culled
+        }
     }
 }

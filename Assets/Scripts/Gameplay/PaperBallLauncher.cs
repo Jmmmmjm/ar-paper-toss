@@ -84,6 +84,12 @@ public class PaperBallLauncher : MonoBehaviour
         {
             _swipeSensitivity = SettingsManager.Instance.GetSensitivityMultiplier();
         }
+
+        var placement = FindFirstObjectByType<PlacementController>();
+        if (placement != null && placement.IsTrashCanPlaced)
+        {
+            EnableThrowing();
+        }
     }
 
     private void HandleSensitivityChanged(float newSensitivity)
@@ -266,6 +272,7 @@ public class PaperBallLauncher : MonoBehaviour
 
     private void SpawnReadyBall()
     {
+        if (_arCamera == null) _arCamera = Camera.main;
         if (_paperBallPrefab == null || _arCamera == null) return;
 
         Vector3 spawnPos = GetReadyBallPosition(Vector2.zero);

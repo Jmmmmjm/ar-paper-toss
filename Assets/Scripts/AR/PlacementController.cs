@@ -34,6 +34,9 @@ public class PlacementController : MonoBehaviour
 
     // Events
     public static event System.Action OnTrashCanPlaced;
+    public static event System.Action OnPlacementReset;
+
+    public bool IsTrashCanPlaced => _spawnedTrashCan != null && _spawnedTrashCan.activeSelf;
 
     private void Awake()
     {
@@ -178,10 +181,6 @@ public class PlacementController : MonoBehaviour
 
     /// <summary>
     /// Detect tap or mouse click to place the Trash Can.
-    public static event System.Action OnPlacementReset;
-
-    /// <summary>
-    /// Detect tap or mouse click to place the Trash Can.
     /// </summary>
     private void HandleTapInput()
     {
@@ -234,6 +233,11 @@ public class PlacementController : MonoBehaviour
             _spawnedTrashCan.transform.SetPositionAndRotation(_currentHitPosition, _currentHitRotation);
             _spawnedTrashCan.SetActive(true);
         }
+
+        // Trigger juicy spawn-in drop bounce
+        var canAnimator = _spawnedTrashCan.GetComponent<TrashCanAnimator>();
+        if (canAnimator != null)
+            canAnimator.PlaySpawnInAnimation();
 
         // Spawn / align an invisible floor physics collider at the exact placed floor height
         SetupFloorCollider(_currentHitPosition);

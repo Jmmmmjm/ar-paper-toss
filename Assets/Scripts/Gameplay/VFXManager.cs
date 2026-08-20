@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Manages tiered gameplay visual effects using Cartoon FX Remaster:
@@ -31,6 +31,9 @@ public class VFXManager : MonoBehaviour
 
     [Header("Impact VFX Prefabs")]
     [SerializeField] private GameObject _impactPoofPrefab;
+
+    [Header("Airplane Obstacle Hit VFX (Light & Subtle)")]
+    [SerializeField] private GameObject _airplaneLightHitPrefab;
 
     private void Awake()
     {
@@ -149,5 +152,17 @@ public class VFXManager : MonoBehaviour
         poof.transform.localScale = Vector3.one * scale;
 
         Destroy(poof, 1.2f);
+    }
+
+    public void PlayAirplaneHitVFX(Vector3 position)
+    {
+        if (_airplaneLightHitPrefab != null)
+        {
+            SpawnVFX(_airplaneLightHitPrefab, position, 0.22f, 1.0f);
+        }
+        else
+        {
+            PlayImpactPoof(position, Vector3.up, 0.8f);
+        }
     }
 }

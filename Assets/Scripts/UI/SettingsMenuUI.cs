@@ -26,6 +26,7 @@ public class SettingsMenuUI : MonoBehaviour
     [SerializeField] private Button _resetScoreButton;
     [SerializeField] private TextMeshProUGUI _resetScoreText;
 
+    [SerializeField] private Button _mainMenuButton;
     [SerializeField] private Button _closeButton;
 
     private bool _confirmingScoreReset = false;
@@ -43,6 +44,7 @@ public class SettingsMenuUI : MonoBehaviour
         if (_hapticsButton != null) _hapticsButton.onClick.AddListener(OnHapticsClicked);
         if (_sensitivityButton != null) _sensitivityButton.onClick.AddListener(OnSensitivityClicked);
         if (_resetScoreButton != null) _resetScoreButton.onClick.AddListener(OnResetScoreClicked);
+        if (_mainMenuButton != null) _mainMenuButton.onClick.AddListener(OnMainMenuClicked);
         if (_closeButton != null) _closeButton.onClick.AddListener(CloseSettings);
     }
 
@@ -52,21 +54,51 @@ public class SettingsMenuUI : MonoBehaviour
         if (_hapticsButton != null) _hapticsButton.onClick.RemoveListener(OnHapticsClicked);
         if (_sensitivityButton != null) _sensitivityButton.onClick.RemoveListener(OnSensitivityClicked);
         if (_resetScoreButton != null) _resetScoreButton.onClick.RemoveListener(OnResetScoreClicked);
+        if (_mainMenuButton != null) _mainMenuButton.onClick.RemoveListener(OnMainMenuClicked);
         if (_closeButton != null) _closeButton.onClick.RemoveListener(CloseSettings);
     }
 
-    public void OpenSettings()
+    private bool _openedFromMainMenu = false;
+
+    private void OnMainMenuClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
+        _openedFromMainMenu = false;
+        CloseSettings();
+
+        if (MainMenuUI.Instance != null)
+        {
+            MainMenuUI.Instance.ShowMainMenu();
+        }
+    }
+
+    public void OpenSettings(bool fromMainMenu = false)
+    {
+        _openedFromMainMenu = fromMainMenu;
         _confirmingScoreReset = false;
         UpdateUI();
 
+        gameObject.SetActive(true);
+
         if (_modalRoot != null)
+        {
             _modalRoot.SetActive(true);
+            _modalRoot.transform.SetAsLastSibling();
+        }
+        transform.SetAsLastSibling();
+
+        // Show "RETURN TO MAIN MENU" only when in active gameplay, hide if opened directly from title screen
+        if (_mainMenuButton != null)
+        {
+            _mainMenuButton.gameObject.SetActive(!_openedFromMainMenu);
+        }
 
         if (SettingsManager.Instance != null)
             SettingsManager.Instance.SetGamePaused(true);
 
-        if (_modalDialog != null)
+        if (_modalDialog != null && gameObject.activeInHierarchy)
         {
             if (_animateCoroutine != null) StopCoroutine(_animateCoroutine);
             _animateCoroutine = StartCoroutine(AnimatePop(_modalDialog, true));
@@ -86,11 +118,25 @@ public class SettingsMenuUI : MonoBehaviour
             _animateCoroutine = StartCoroutine(AnimatePop(_modalDialog, false, () =>
             {
                 if (_modalRoot != null) _modalRoot.SetActive(false);
+                gameObject.SetActive(false);
+
+                if (_openedFromMainMenu && MainMenuUI.Instance != null)
+                {
+                    _openedFromMainMenu = false;
+                    MainMenuUI.Instance.ShowMainMenu(animate: false);
+                }
             }));
         }
         else
         {
             if (_modalRoot != null) _modalRoot.SetActive(false);
+            gameObject.SetActive(false);
+
+            if (_openedFromMainMenu && MainMenuUI.Instance != null)
+            {
+                _openedFromMainMenu = false;
+                MainMenuUI.Instance.ShowMainMenu(animate: false);
+            }
         }
     }
 
@@ -201,24 +247,38 @@ public class SettingsMenuUI : MonoBehaviour
     private IEnumerator AnimatePop(RectTransform target, bool opening, System.Action onComplete = null)
     {
         float elapsed = 0f;
-        float duration = 0.18f;
-        Vector3 startScale = opening ? Vector3.one * 0.7f : Vector3.one;
-        Vector3 endScale = opening ? Vector3.one : Vector3.one * 0.7f;
+        float duration = opening ? 0.14f : 0.08f;
+        Vector3 startScale = opening ? Vector3.one * 0.85f : Vector3.one;
+        Vector3 endScale = opening ? Vector3.one : Vector3.one * 0.85f;
 
         target.localScale = startScale;
 
         while (elapsed < duration)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = elapsed / duration;
-            // Stepped quantization for retro feel
-            float curve = opening ? Mathf.Sin(t * Mathf.PI * 0.5f) : (1f - t);
-            curve = Mathf.Round(curve * 10f) / 10f;
-            target.localScale = Vector3.Lerp(startScale, endScale, curve);
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            float curve;
+            if (opening)
+            {
+                float c1 = 1.3f;
+                float c3 = c1 + 1f;
+                curve = 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
+            }
+            else
+            {
+                curve = 1f - (t * t);
+            }
+
+            target.localScale = Vector3.LerpUnclamped(startScale, endScale, curve);
             yield return null;
         }
 
-        target.localScale = endScale;
+        target.localScale = opening ? Vector3.one : endScale;
+        if (!opening)
+        {
+            target.localScale = Vector3.one; // Reset for next open
+        }
         onComplete?.Invoke();
     }
 }

@@ -62,10 +62,19 @@ public class ScoreboardUI : MonoBehaviour
                 var setBtnObj = _scoreboardPanel.transform.Find("SettingsButton");
                 if (setBtnObj != null) _settingsButton = setBtnObj.GetComponent<Button>();
             }
+
+            // Hide scoreboard initially until game starts
+            _scoreboardPanel.SetActive(false);
         }
 
         if (_popupText != null)
             _popupText.gameObject.SetActive(false);
+    }
+
+    public void SetScoreboardVisible(bool visible)
+    {
+        if (_scoreboardPanel != null)
+            _scoreboardPanel.SetActive(visible);
     }
 
     private void OnEnable()

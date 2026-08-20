@@ -147,6 +147,10 @@ public class PaperBall : MonoBehaviour
                     if (AudioManager.Instance != null && vel.magnitude > 0.4f)
                         AudioManager.Instance.PlayImpactSound(vel.magnitude);
 
+                    var canAnim = hit.collider.GetComponentInParent<TrashCanAnimator>();
+                    if (canAnim != null)
+                        canAnim.PlayRimHitRecoil(hit.point, vel);
+
                     OnBallLanded?.Invoke(this);
                     StartCoroutine(EvaluateScoreOrMissRoutine());
                     Destroy(gameObject, _autoDestroyDelay);
@@ -162,10 +166,15 @@ public class PaperBall : MonoBehaviour
         _isInFlight = false;
 
         float impactSpeed = collision.relativeVelocity.magnitude;
-        if (VFXManager.Instance != null && collision.contactCount > 0 && impactSpeed > 0.6f)
+        if (collision.contactCount > 0)
         {
             ContactPoint contact = collision.GetContact(0);
-            VFXManager.Instance.PlayImpactPoof(contact.point, contact.normal, impactSpeed);
+            if (VFXManager.Instance != null && impactSpeed > 0.6f)
+                VFXManager.Instance.PlayImpactPoof(contact.point, contact.normal, impactSpeed);
+
+            var canAnim = collision.gameObject.GetComponentInParent<TrashCanAnimator>();
+            if (canAnim != null)
+                canAnim.PlayRimHitRecoil(contact.point, collision.relativeVelocity);
         }
 
         if (AudioManager.Instance != null && impactSpeed > 0.4f)

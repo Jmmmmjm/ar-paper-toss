@@ -151,6 +151,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 24cd640a2d931a74fb1249d8620b32c9, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5064214236095078864}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 24cd640a2d931a74fb1249d8620b32c9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1037225449352096643}
   m_SourcePrefab: {fileID: 100100000, guid: 24cd640a2d931a74fb1249d8620b32c9, type: 3}
 --- !u!4 &42239194925553688 stripped
 Transform:
@@ -184,3 +187,24 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -2124705421725058983, guid: 24cd640a2d931a74fb1249d8620b32c9, type: 3}
+--- !u!114 &1037225449352096643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855051703229252258}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a74242eb1fe8914a81cb531bf7c5f61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _visualModel: {fileID: 42239194925553688}
+  _spawnDropHeight: 0.55
+  _spawnDuration: 0.58
+  _spawnWobbleAngle: 14
+  _scoreHopHeight: 0.04
+  _scoreSquashFactor: 0.18
+  _scoreDuration: 0.38
+  _maxTiltAngle: 6.5
+  _recoilDuration: 0.28
