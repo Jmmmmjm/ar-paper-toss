@@ -15,6 +15,15 @@ jobs:
         with:
           lfs: true
 
+      - name: Select Xcode 16
+        run: |
+          XCODE_16_APP=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -n "$XCODE_16_APP" ]; then
+            echo "Selecting $XCODE_16_APP"
+            sudo xcode-select -s "$XCODE_16_APP/Contents/Developer"
+          fi
+          xcodebuild -version
+
       - name: Install Unity 6 and iOS Build Support
         run: |
           brew install --cask unity-hub
