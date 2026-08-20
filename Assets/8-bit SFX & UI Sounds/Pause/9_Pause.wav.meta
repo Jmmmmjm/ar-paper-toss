@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 219a7ab0203d5fa41a65bcf561450c81
+AssetOrigin:
+  serializedVersion: 1
+  productId: 379104
+  packageName: 8-bit SFX & UI Sounds
+  packageVersion: 1.0
+  assetPath: Assets/8-bit SFX & UI Sounds/Pause/9_Pause.wav
+  uploadId: 914954
 AudioImporter:
   externalObjects: {}
   serializedVersion: 8
@@ -11,7 +18,7 @@ AudioImporter:
     compressionFormat: 1
     quality: 1
     conversionMode: 0
-    preloadAudioData: 0
+    preloadAudioData: 1
   platformSettingOverrides: {}
   forceToMono: 0
   normalize: 1
@@ -21,10 +28,3 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 379104
-  packageName: 8-bit SFX & UI Sounds
-  packageVersion: 1.0
-  assetPath: Assets/8-bit SFX & UI Sounds/Pause/9_Pause.wav
-  uploadId: 914954

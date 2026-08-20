@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -96,6 +96,9 @@ public class SettingsMenuUI : MonoBehaviour
 
     private void OnSFXClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         if (SettingsManager.Instance != null)
         {
             SettingsManager.Instance.ToggleSFX();
@@ -105,6 +108,9 @@ public class SettingsMenuUI : MonoBehaviour
 
     private void OnHapticsClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         if (SettingsManager.Instance != null)
         {
             SettingsManager.Instance.ToggleHaptics();
@@ -114,6 +120,9 @@ public class SettingsMenuUI : MonoBehaviour
 
     private void OnSensitivityClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         if (SettingsManager.Instance != null)
         {
             SettingsManager.Instance.CycleSensitivity();
@@ -123,6 +132,9 @@ public class SettingsMenuUI : MonoBehaviour
 
     private void OnResetScoreClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         if (!_confirmingScoreReset)
         {
             _confirmingScoreReset = true;
@@ -154,31 +166,35 @@ public class SettingsMenuUI : MonoBehaviour
     {
         if (SettingsManager.Instance == null) return;
 
+        Color pocketNavy = new Color(0.133f, 0.137f, 0.235f, 1f); // #22233C (High contrast dark navy)
+        Color mutedPink = new Color(0.55f, 0.35f, 0.45f, 1f);      // Muted state for OFF
+        Color rubyCrimson = new Color(0.72f, 0.08f, 0.22f, 1f);    // Distinct red/crimson for Reset Best
+
         if (_sfxText != null)
         {
             bool sfx = SettingsManager.Instance.SFXEnabled;
-            _sfxText.text = $"SFX: {(sfx ? "ON" : "OFF")}";
-            _sfxText.color = sfx ? new Color(0.2f, 1f, 0.4f, 1f) : new Color(0.7f, 0.7f, 0.7f, 1f);
+            _sfxText.text = $"SFX SOUNDS: {(sfx ? "ON" : "OFF")}";
+            _sfxText.color = sfx ? pocketNavy : mutedPink;
         }
 
         if (_hapticsText != null)
         {
             bool haptics = SettingsManager.Instance.HapticsEnabled;
-            _hapticsText.text = $"HAPTIC: {(haptics ? "ON" : "OFF")}";
-            _hapticsText.color = haptics ? new Color(0.2f, 1f, 0.4f, 1f) : new Color(0.7f, 0.7f, 0.7f, 1f);
+            _hapticsText.text = $"VIBRATION: {(haptics ? "ON" : "OFF")}";
+            _hapticsText.color = haptics ? pocketNavy : mutedPink;
         }
 
         if (_sensitivityText != null)
         {
             string label = SettingsManager.Instance.GetSensitivityLabel();
-            _sensitivityText.text = $"FLICK: {label}";
-            _sensitivityText.color = new Color(0f, 0.9f, 1f, 1f);
+            _sensitivityText.text = $"FLICK POWER: {label}";
+            _sensitivityText.color = pocketNavy;
         }
 
         if (_resetScoreText != null && !_confirmingScoreReset)
         {
-            _resetScoreText.text = "RESET BEST";
-            _resetScoreText.color = new Color(1f, 0.35f, 0.35f, 1f);
+            _resetScoreText.text = "RESET BEST SCORE";
+            _resetScoreText.color = rubyCrimson;
         }
     }
 

@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 47b013a2c2c5f9644b3062cebef72946
+AssetOrigin:
+  serializedVersion: 1
+  productId: 379104
+  packageName: 8-bit SFX & UI Sounds
+  packageVersion: 1.0
+  assetPath: Assets/8-bit SFX & UI Sounds/Death_Screen/2_DeathScreen.wav
+  uploadId: 914954
 AudioImporter:
   externalObjects: {}
   serializedVersion: 8
@@ -11,7 +18,7 @@ AudioImporter:
     compressionFormat: 1
     quality: 1
     conversionMode: 0
-    preloadAudioData: 0
+    preloadAudioData: 1
   platformSettingOverrides: {}
   forceToMono: 0
   normalize: 1
@@ -21,10 +28,3 @@ AudioImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 379104
-  packageName: 8-bit SFX & UI Sounds
-  packageVersion: 1.0
-  assetPath: Assets/8-bit SFX & UI Sounds/Death_Screen/2_DeathScreen.wav
-  uploadId: 914954

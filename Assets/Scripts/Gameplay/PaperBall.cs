@@ -144,6 +144,9 @@ public class PaperBall : MonoBehaviour
                     if (VFXManager.Instance != null && vel.magnitude > 0.6f)
                         VFXManager.Instance.PlayImpactPoof(hit.point, hit.normal, vel.magnitude);
 
+                    if (AudioManager.Instance != null && vel.magnitude > 0.4f)
+                        AudioManager.Instance.PlayImpactSound(vel.magnitude);
+
                     OnBallLanded?.Invoke(this);
                     StartCoroutine(EvaluateScoreOrMissRoutine());
                     Destroy(gameObject, _autoDestroyDelay);
@@ -163,6 +166,11 @@ public class PaperBall : MonoBehaviour
         {
             ContactPoint contact = collision.GetContact(0);
             VFXManager.Instance.PlayImpactPoof(contact.point, contact.normal, impactSpeed);
+        }
+
+        if (AudioManager.Instance != null && impactSpeed > 0.4f)
+        {
+            AudioManager.Instance.PlayImpactSound(impactSpeed);
         }
 
         OnBallLanded?.Invoke(this);

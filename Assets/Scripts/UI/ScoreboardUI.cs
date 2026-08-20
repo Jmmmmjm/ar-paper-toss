@@ -115,6 +115,9 @@ public class ScoreboardUI : MonoBehaviour
 
     private void OpenSettings()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         var settingsUI = FindFirstObjectByType<SettingsMenuUI>(FindObjectsInactive.Include);
         if (settingsUI != null)
         {
@@ -127,8 +130,13 @@ public class ScoreboardUI : MonoBehaviour
     /// </summary>
     public void RefreshGame()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+
         _currentScore = 0;
         _currentStreak = 0;
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.ResetStreakSFX();
         UpdateDisplay();
 
         // 1. Reset AR placement to let player reposition trash can
