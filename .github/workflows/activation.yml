@@ -8,6 +8,11 @@ jobs:
     name: Acquire .alf file
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
       - name: Request manual activation file
         uses: game-ci/unity-builder@v4
         env:
@@ -22,4 +27,4 @@ jobs:
         with:
           name: Unity_v6000.1.6f1.alf
           path: '**/*.alf'
-          if-no-files-found: warn
+          if-no-files-found: error
