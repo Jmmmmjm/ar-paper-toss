@@ -15,7 +15,7 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Unity License
+      - name: Setup Unity Entitlement License
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         run: |
@@ -23,9 +23,12 @@ jobs:
           mkdir -p "$HOME/Library/Application Support/Unity/licenses"
           echo "$UNITY_LICENSE" | sudo tee "/Library/Application Support/Unity/licenses/UnityEntitlementLicense.xml" > /dev/null
           echo "$UNITY_LICENSE" | tee "$HOME/Library/Application Support/Unity/licenses/UnityEntitlementLicense.xml" > /dev/null
-          echo "$UNITY_LICENSE" | sudo tee "/Library/Application Support/Unity/Unity_lic.ulf" > /dev/null
-          echo "$UNITY_LICENSE" | tee "$HOME/Library/Application Support/Unity/Unity_lic.ulf" > /dev/null
           sudo chmod -R 777 "/Library/Application Support/Unity"
+
+      - name: Install Unity 6 and iOS Build Support
+        run: |
+          brew install --cask unity-hub
+          "/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" -- --headless install --version 6000.1.6f1 --changeset d64b1a599cad --module ios --architecture arm64 --childModules
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -35,14 +38,16 @@ jobs:
           restore-keys: |
             Library-iOS-
 
-      - name: Build Unity iOS Xcode Project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        with:
-          targetPlatform: iOS
-          unityVersion: 6000.1.6f1
-          buildsPath: build
+      - name: Export Xcode Project from Unity
+        run: |
+          /Applications/Unity/Hub/Editor/6000.1.6f1/Unity.app/Contents/MacOS/Unity \
+            -batchmode \
+            -nographics \
+            -quit \
+            -projectPath . \
+            -executeMethod iOSBuildScript.Build \
+            -logfile build_unity.log || (cat build_unity.log && exit 1)
+          cat build_unity.log
 
       - name: Package Xcode to Unsigned IPA
         run: |
