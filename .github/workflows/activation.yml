@@ -5,26 +5,21 @@ on:
 
 jobs:
   activation:
-    name: Generate Unity .alf Activation File
-    runs-on: macos-14
+    name: Acquire .alf file
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Request manual activation file
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ''
+        with:
+          targetPlatform: iOS
+          unityVersion: 6000.1.6f1
+        continue-on-error: true
 
-      - name: Download & Install Unity 6000.1.6f1
-        run: |
-          # Install Unity 6 on macOS runner
-          brew install --cask unity
-          
-      - name: Create Manual Activation File (.alf)
-        run: |
-          /Applications/Unity/Unity.app/Contents/MacOS/Unity -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
-          mkdir -p output
-          find . -name "*.alf" -exec cp {} output/ \;
-
-      - name: Upload .alf File Artifact
+      - name: Expose .alf file as artifact
         uses: actions/upload-artifact@v4
         with:
           name: Unity_v6000.1.6f1.alf
-          path: output/*.alf
-          retention-days: 7
+          path: '**/*.alf'
+          if-no-files-found: warn
