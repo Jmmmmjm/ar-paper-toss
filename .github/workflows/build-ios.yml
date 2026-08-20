@@ -1,0 +1,54 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS Application
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-iOS-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-iOS-
+
+      - name: Build Unity iOS Xcode Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: iOS
+          unityVersion: 6000.1.6f1
+          buildsPath: build
+
+      - name: Package Xcode to Unsigned IPA
+        run: |
+          cd build/iOS
+          # Build archive with code signing disabled for sideloading
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO -archivePath build/Unity-iPhone.xcarchive archive
+          
+          # Package into standard Payload .ipa format
+          mkdir -p ../../output/Payload
+          cp -r build/Unity-iPhone.xcarchive/Products/Applications/*.app ../../output/Payload/
+          cd ../../output
+          zip -r ARPaperToss.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARPaperToss-iOS-IPA
+          path: output/ARPaperToss.ipa
+          retention-days: 14
