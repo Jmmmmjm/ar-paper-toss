@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEditor.XR.ARKit;
 using UnityEditor.XR.Management;
 using UnityEditor.XR.Management.Metadata;
 using UnityEngine;
@@ -33,7 +34,29 @@ public static class iOSBuildScript
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.iOS), ScriptingImplementation.IL2CPP);
 
         // 3. Initialize & Configure XR Plug-in Management for iOS
-        var buildTargetSettings = XRGeneralSettingsPerBuildTarget.GetOrCreate();
+        XRGeneralSettingsPerBuildTarget buildTargetSettings = null;
+        if (!EditorBuildSettings.TryGetConfigObject(XRGeneralSettings.k_SettingsKey, out buildTargetSettings) || buildTargetSettings == null)
+        {
+            var assets = AssetDatabase.FindAssets("t:XRGeneralSettingsPerBuildTarget");
+            if (assets.Length > 0)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(assets[0]);
+                buildTargetSettings = AssetDatabase.LoadAssetAtPath<XRGeneralSettingsPerBuildTarget>(path);
+                if (buildTargetSettings != null)
+                {
+                    EditorBuildSettings.AddConfigObject(XRGeneralSettings.k_SettingsKey, buildTargetSettings, true);
+                }
+            }
+
+            if (buildTargetSettings == null)
+            {
+                buildTargetSettings = ScriptableObject.CreateInstance<XRGeneralSettingsPerBuildTarget>();
+                if (!Directory.Exists("Assets/XR")) Directory.CreateDirectory("Assets/XR");
+                AssetDatabase.CreateAsset(buildTargetSettings, "Assets/XR/XRGeneralSettingsPerBuildTarget.asset");
+                EditorBuildSettings.AddConfigObject(XRGeneralSettings.k_SettingsKey, buildTargetSettings, true);
+            }
+        }
+
         if (!buildTargetSettings.HasManagerSettingsForBuildTarget(BuildTargetGroup.iOS))
         {
             buildTargetSettings.CreateDefaultManagerSettingsForBuildTarget(BuildTargetGroup.iOS);
