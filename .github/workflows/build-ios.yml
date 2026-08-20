@@ -15,6 +15,11 @@ jobs:
         with:
           lfs: true
 
+      - name: Select Xcode 16
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          xcodebuild -version
+
       - name: Install Unity 6 and iOS Build Support
         run: |
           brew install --cask unity-hub
@@ -45,6 +50,7 @@ jobs:
             -batchmode \
             -nographics \
             -quit \
+            -buildTarget iOS \
             -projectPath . \
             -executeMethod iOSBuildScript.Build \
             -logfile build_unity.log || (cat build_unity.log && exit 1)
