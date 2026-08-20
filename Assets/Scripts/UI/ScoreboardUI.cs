@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Manages the top scoreboard UI, tracking current score, streak, best score, and animated score popups.
+/// Manages the retro GBA / 8-bit arcade scoreboard UI.
+/// Tracks zero-padded scores (0000), combo multipliers, high scores, and arcade popup animations.
 /// Listens to ScoreTrigger and PaperBall events.
 /// </summary>
 public class ScoreboardUI : MonoBehaviour
@@ -15,8 +16,10 @@ public class ScoreboardUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _bestText;
     [SerializeField] private TextMeshProUGUI _popupText;
 
-    [Header("UI Panels")]
+    [Header("UI Panels & Controls")]
     [SerializeField] private GameObject _scoreboardPanel;
+    [SerializeField] private Button _refreshButton;
+    [SerializeField] private Button _settingsButton;
 
     [Header("Score Settings")]
     [SerializeField] private int _pointsPerScore = 1;
@@ -25,6 +28,7 @@ public class ScoreboardUI : MonoBehaviour
     private int _currentStreak = 0;
     private int _bestScore = 0;
     private Coroutine _popupCoroutine;
+    private Coroutine _scorePunchCoroutine;
 
     private const string BestScorePrefKey = "AR_PaperToss_BestScore";
 
@@ -32,6 +36,12 @@ public class ScoreboardUI : MonoBehaviour
     {
         _bestScore = PlayerPrefs.GetInt(BestScorePrefKey, 0);
         UpdateDisplay();
+
+        // Ensure ScoreboardPanel has SafeArea component attached to avoid Dynamic Island / notch
+        if (_scoreboardPanel != null && _scoreboardPanel.GetComponent<SafeArea>() == null)
+        {
+            _scoreboardPanel.AddComponent<SafeArea>();
+        }
 
         if (_popupText != null)
             _popupText.gameObject.SetActive(false);
@@ -42,6 +52,13 @@ public class ScoreboardUI : MonoBehaviour
         ScoreTrigger.OnSuccessfulScore += HandleScore;
         PaperBall.OnBallLanded += HandleBallLanded;
         PlacementController.OnTrashCanPlaced += HandleCanPlaced;
+        SettingsManager.OnHighScoreReset += HandleHighScoreReset;
+
+        if (_refreshButton != null)
+            _refreshButton.onClick.AddListener(RefreshGame);
+
+        if (_settingsButton != null)
+            _settingsButton.onClick.AddListener(OpenSettings);
     }
 
     private void OnDisable()
@@ -49,6 +66,62 @@ public class ScoreboardUI : MonoBehaviour
         ScoreTrigger.OnSuccessfulScore -= HandleScore;
         PaperBall.OnBallLanded -= HandleBallLanded;
         PlacementController.OnTrashCanPlaced -= HandleCanPlaced;
+        SettingsManager.OnHighScoreReset -= HandleHighScoreReset;
+
+        if (_refreshButton != null)
+            _refreshButton.onClick.RemoveListener(RefreshGame);
+
+        if (_settingsButton != null)
+            _settingsButton.onClick.RemoveListener(OpenSettings);
+    }
+
+    private void HandleHighScoreReset()
+    {
+        _bestScore = 0;
+        UpdateDisplay();
+        ShowPopup("[ BEST RESET ]", new Color(1f, 0.4f, 0.4f, 1f));
+    }
+
+    private void OpenSettings()
+    {
+        var settingsUI = FindFirstObjectByType<SettingsMenuUI>(FindObjectsInactive.Include);
+        if (settingsUI != null)
+        {
+            settingsUI.OpenSettings();
+        }
+    }
+
+    /// <summary>
+    /// Triggered by the Refresh button or externally to reset the game run and re-enable AR trash can positioning.
+    /// </summary>
+    public void RefreshGame()
+    {
+        _currentScore = 0;
+        _currentStreak = 0;
+        UpdateDisplay();
+
+        // 1. Reset AR placement to let player reposition trash can
+        var placementController = FindFirstObjectByType<PlacementController>();
+        if (placementController != null)
+        {
+            placementController.ResetPlacement();
+        }
+
+        // 2. Clear all loose paper balls and reset launcher
+        var launcher = FindFirstObjectByType<PaperBallLauncher>();
+        if (launcher != null)
+        {
+            launcher.ResetLauncher();
+        }
+
+        // 3. Animate refresh button punch
+        if (_refreshButton != null)
+        {
+            StartCoroutine(RetroPunchScale(_refreshButton.transform, 1.25f, 0.18f));
+        }
+
+        // 4. Show retro feedback popup
+        ShowPopup("[ REFRESH ]", new Color(0f, 0.9f, 1f, 1f));
     }
 
     private void HandleCanPlaced()
@@ -62,22 +135,45 @@ public class ScoreboardUI : MonoBehaviour
         _currentStreak++;
         _currentScore += _pointsPerScore;
 
+        bool isNewRecord = false;
         if (_currentScore > _bestScore)
         {
             _bestScore = _currentScore;
             PlayerPrefs.SetInt(BestScorePrefKey, _bestScore);
             PlayerPrefs.Save();
+            isNewRecord = true;
         }
 
         UpdateDisplay();
 
-        // Punch animation on score text
+        // Retro stepped punch animation on score text
         if (_scoreText != null)
-            StartCoroutine(PunchScale(_scoreText.transform, 1.3f, 0.2f));
+        {
+            if (_scorePunchCoroutine != null) StopCoroutine(_scorePunchCoroutine);
+            _scorePunchCoroutine = StartCoroutine(RetroPunchScale(_scoreText.transform, 1.35f, 0.22f));
+        }
 
-        // Show floating combo text
-        string popupMsg = _currentStreak > 1 ? $"STREAK ×{_currentStreak}!" : "SWISH!";
-        ShowPopup(popupMsg, _currentStreak > 1 ? Color.yellow : Color.green);
+        // Show retro floating combo banner
+        string popupMsg;
+        Color popupColor;
+
+        if (isNewRecord && _currentScore > 1)
+        {
+            popupMsg = "* NEW RECORD! *";
+            popupColor = new Color(0.2f, 1.0f, 0.4f, 1.0f); // Phosphor Green
+        }
+        else if (_currentStreak > 1)
+        {
+            popupMsg = $"* COMBO x{_currentStreak}! *";
+            popupColor = new Color(1.0f, 0.85f, 0.1f, 1.0f); // Retro Gold
+        }
+        else
+        {
+            popupMsg = "* SWISH! *";
+            popupColor = new Color(0.2f, 1.0f, 0.4f, 1.0f); // Retro Green
+        }
+
+        ShowPopup(popupMsg, popupColor);
     }
 
     private void HandleBallLanded(PaperBall ball)
@@ -89,7 +185,7 @@ public class ScoreboardUI : MonoBehaviour
             {
                 _currentStreak = 0;
                 UpdateDisplay();
-                ShowPopup("MISSED!", new Color(1f, 0.4f, 0.4f, 1f));
+                ShowPopup("[ MISS! ]", new Color(1f, 0.25f, 0.35f, 1f));
             }
         }
     }
@@ -97,13 +193,13 @@ public class ScoreboardUI : MonoBehaviour
     private void UpdateDisplay()
     {
         if (_scoreText != null)
-            _scoreText.text = _currentScore.ToString();
+            _scoreText.text = _currentScore.ToString("D4"); // Zero-padded 8-bit score (e.g. 0000, 0001, 0025)
 
         if (_streakText != null)
         {
             if (_currentStreak > 1)
             {
-                _streakText.text = $"🔥 ×{_currentStreak}";
+                _streakText.text = $"COMBO x{_currentStreak}";
                 _streakText.gameObject.SetActive(true);
             }
             else
@@ -113,7 +209,7 @@ public class ScoreboardUI : MonoBehaviour
         }
 
         if (_bestText != null)
-            _bestText.text = $"BEST: {_bestScore}";
+            _bestText.text = $"HI {_bestScore:D4}";
     }
 
     private void ShowPopup(string text, Color color)
@@ -131,25 +227,45 @@ public class ScoreboardUI : MonoBehaviour
         _popupText.text = text;
         _popupText.color = color;
         _popupText.gameObject.SetActive(true);
-        _popupText.transform.localScale = Vector3.one * 0.7f;
+        _popupText.transform.localScale = Vector3.one * 0.8f;
 
         float elapsed = 0f;
-        float duration = 0.8f;
+        float duration = 0.85f;
+
+        // Position popup dynamically underneath the scoreboard panel
         Vector3 basePos = _popupText.transform.localPosition;
+        if (_scoreboardPanel != null)
+        {
+            RectTransform panelRt = _scoreboardPanel.GetComponent<RectTransform>();
+            if (panelRt != null)
+            {
+                basePos = new Vector3(0f, panelRt.anchoredPosition.y - panelRt.rect.height - 20f, 0f);
+            }
+        }
+        _popupText.transform.localPosition = basePos;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
 
-            // Scale pop and float upwards
-            float scale = Mathf.Lerp(1.2f, 1.0f, t);
+            // Stepped scale animation for retro pixel feel
+            float scale = Mathf.Lerp(1.25f, 1.0f, t);
             _popupText.transform.localScale = Vector3.one * scale;
-            _popupText.transform.localPosition = basePos + new Vector3(0f, t * 40f, 0f);
+            _popupText.transform.localPosition = basePos + new Vector3(0f, t * 35f, 0f);
 
-            // Fade out
+            // Retro arcade blinking near the end of the duration
             Color c = color;
-            c.a = Mathf.Clamp01(1f - (t * t));
+            if (t > 0.6f)
+            {
+                // Blink effect
+                float blink = Mathf.Floor((t - 0.6f) * 15f) % 2 == 0 ? 1f : 0.2f;
+                c.a = Mathf.Clamp01((1f - t) * 2.5f) * blink;
+            }
+            else
+            {
+                c.a = 1f;
+            }
             _popupText.color = c;
 
             yield return null;
@@ -159,7 +275,7 @@ public class ScoreboardUI : MonoBehaviour
         _popupText.gameObject.SetActive(false);
     }
 
-    private IEnumerator PunchScale(Transform target, float punchScale, float duration)
+    private IEnumerator RetroPunchScale(Transform target, float punchScale, float duration)
     {
         Vector3 originalScale = Vector3.one;
         float elapsed = 0f;
@@ -167,7 +283,9 @@ public class ScoreboardUI : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
+            // Stepped spring bounce for authentic retro vibe
             float s = Mathf.Sin(t * Mathf.PI) * (punchScale - 1f) + 1f;
+            s = Mathf.Round(s * 20f) / 20f; // Quantize scale to steps
             target.localScale = originalScale * s;
             yield return null;
         }

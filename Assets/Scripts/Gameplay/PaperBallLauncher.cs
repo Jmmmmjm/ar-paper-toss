@@ -27,6 +27,18 @@ public class PaperBallLauncher : MonoBehaviour
     [Tooltip("Delay in seconds before spawning the next ball after a throw.")]
     [SerializeField] private float _respawnDelay = 1.0f;
 
+    [Header("Screen Anchoring")]
+    [Tooltip("Viewport X position (0.5 = center of screen).")]
+    [Range(0.1f, 0.9f)]
+    [SerializeField] private float _viewportX = 0.5f;
+
+    [Tooltip("Viewport Y position (0.12 = bottom of screen, above home bar).")]
+    [Range(0.05f, 0.4f)]
+    [SerializeField] private float _viewportY = 0.12f;
+
+    [Tooltip("Distance in meters in front of the camera.")]
+    [SerializeField] private float _cameraDistance = 0.38f;
+
     [Header("Input Filtering")]
     [SerializeField] private float _minSwipeDistance = 30f;
     [SerializeField] private float _maxSwipeTime = 0.7f;
@@ -37,7 +49,10 @@ public class PaperBallLauncher : MonoBehaviour
     private bool _canThrow = false;
     private bool _isTrackingSwipe = false;
     private Vector2 _swipeStartPosition;
+    private Vector2 _currentPointerPosition;
     private float _swipeStartTime;
+
+    private bool _isPaused = false;
 
     private void Awake()
     {
@@ -47,43 +62,85 @@ public class PaperBallLauncher : MonoBehaviour
     private void OnEnable()
     {
         PlacementController.OnTrashCanPlaced += EnableThrowing;
+        PlacementController.OnPlacementReset += DisableThrowing;
+        SettingsManager.OnSensitivityMultiplierChanged += HandleSensitivityChanged;
+        SettingsManager.OnPauseStateChanged += HandlePauseStateChanged;
     }
 
     private void OnDisable()
     {
         PlacementController.OnTrashCanPlaced -= EnableThrowing;
+        PlacementController.OnPlacementReset -= DisableThrowing;
+        SettingsManager.OnSensitivityMultiplierChanged -= HandleSensitivityChanged;
+        SettingsManager.OnPauseStateChanged -= HandlePauseStateChanged;
     }
 
     private void Start()
     {
         if (_arCamera == null)
             _arCamera = Camera.main;
+
+        if (SettingsManager.Instance != null)
+        {
+            _swipeSensitivity = SettingsManager.Instance.GetSensitivityMultiplier();
+        }
+    }
+
+    private void HandleSensitivityChanged(float newSensitivity)
+    {
+        _swipeSensitivity = newSensitivity;
+    }
+
+    private void HandlePauseStateChanged(bool paused)
+    {
+        _isPaused = paused;
     }
 
     public void EnableThrowing()
     {
         _canThrow = true;
-        SpawnReadyBall();
+        ResetLauncher();
     }
 
     public void DisableThrowing()
     {
         _canThrow = false;
+        ClearAllBalls();
+    }
+
+    public void ResetLauncher()
+    {
+        ClearAllBalls();
+        if (_canThrow)
+        {
+            SpawnReadyBall();
+        }
+    }
+
+    private void ClearAllBalls()
+    {
         if (_currentBall != null)
         {
             Destroy(_currentBall);
             _currentBall = null;
         }
+
+        PaperBall[] balls = FindObjectsByType<PaperBall>(FindObjectsSortMode.None);
+        foreach (var b in balls)
+        {
+            if (b != null) Destroy(b.gameObject);
+        }
     }
 
     private void Update()
     {
-        if (!_canThrow || _arCamera == null) return;
+        if (!_canThrow || _isPaused || _arCamera == null) return;
 
-        // Keep the ready ball floating in front of the camera view
-        if (_currentBall != null && !_isTrackingSwipe)
+        // Keep the ready ball anchored to the bottom of the screen / follow thumb drag
+        if (_currentBall != null)
         {
-            Vector3 targetPos = _arCamera.transform.TransformPoint(_spawnOffset);
+            Vector2 dragOffset = _isTrackingSwipe ? (_currentPointerPosition - _swipeStartPosition) : Vector2.zero;
+            Vector3 targetPos = GetReadyBallPosition(dragOffset);
             _currentBall.transform.position = targetPos;
             _currentBall.transform.rotation = _arCamera.transform.rotation;
         }
@@ -91,8 +148,37 @@ public class PaperBallLauncher : MonoBehaviour
         ProcessInput();
     }
 
+    private Vector3 GetReadyBallPosition(Vector2 dragDeltaPixels)
+    {
+        if (_arCamera == null) _arCamera = Camera.main;
+        if (_arCamera == null) return Vector3.zero;
+
+        float viewWidth = Screen.width > 0 ? (float)Screen.width : 1080f;
+        float viewHeight = Screen.height > 0 ? (float)Screen.height : 1920f;
+
+        float dragNormX = Mathf.Clamp(dragDeltaPixels.x / viewWidth, -0.2f, 0.2f);
+        float dragNormY = Mathf.Clamp(dragDeltaPixels.y / viewHeight, -0.04f, 0.12f);
+
+        Vector3 viewportPos = new Vector3(_viewportX + dragNormX, _viewportY + dragNormY, _cameraDistance);
+        return _arCamera.ViewportToWorldPoint(viewportPos);
+    }
+
     private void ProcessInput()
     {
+        // Don't process throws if pointer started over UI
+        if (UnityEngine.EventSystems.EventSystem.current != null)
+        {
+#if UNITY_EDITOR
+            if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+#else
+            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+            {
+                int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
+                if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId)) return;
+            }
+#endif
+        }
+
         bool pointerDown = false;
         bool pointerUp = false;
         Vector2 pointerPos = Vector2.zero;
@@ -112,6 +198,8 @@ public class PaperBallLauncher : MonoBehaviour
             pointerPos = Touchscreen.current.primaryTouch.position.ReadValue();
         }
 #endif
+
+        _currentPointerPosition = pointerPos;
 
         if (pointerDown)
         {
@@ -172,7 +260,7 @@ public class PaperBallLauncher : MonoBehaviour
     {
         if (_paperBallPrefab == null || _arCamera == null) return;
 
-        Vector3 spawnPos = _arCamera.transform.TransformPoint(_spawnOffset);
+        Vector3 spawnPos = GetReadyBallPosition(Vector2.zero);
         _currentBall = Instantiate(_paperBallPrefab, spawnPos, _arCamera.transform.rotation);
 
         Rigidbody rb = _currentBall.GetComponent<Rigidbody>();

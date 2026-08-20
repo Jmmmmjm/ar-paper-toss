@@ -167,10 +167,28 @@ public class PlacementController : MonoBehaviour
 
     /// <summary>
     /// Detect tap or mouse click to place the Trash Can.
+    public static event System.Action OnPlacementReset;
+
+    /// <summary>
+    /// Detect tap or mouse click to place the Trash Can.
     /// </summary>
     private void HandleTapInput()
     {
         if (!_placementReady) return;
+
+        // Prevent placing if clicking over UI (such as the Reset button)
+        if (UnityEngine.EventSystems.EventSystem.current != null)
+        {
+#if UNITY_EDITOR
+            if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
+#else
+            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+            {
+                int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
+                if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId)) return;
+            }
+#endif
+        }
 
         bool tapped = false;
 
@@ -203,6 +221,7 @@ public class PlacementController : MonoBehaviour
         else
         {
             _spawnedTrashCan.transform.SetPositionAndRotation(_currentHitPosition, _currentHitRotation);
+            _spawnedTrashCan.SetActive(true);
         }
 
         // Spawn / align an invisible floor physics collider at the exact placed floor height
@@ -248,6 +267,24 @@ public class PlacementController : MonoBehaviour
     {
         _placementLocked = false;
         SetPlanesVisible(true);
+    }
+
+    /// <summary>
+    /// Resets AR placement, hides current trash can, and re-activates targeting ring.
+    /// </summary>
+    public void ResetPlacement()
+    {
+        _placementLocked = false;
+        if (_spawnedTrashCan != null)
+        {
+            _spawnedTrashCan.SetActive(false);
+        }
+        if (_placementIndicator != null)
+        {
+            _placementIndicator.SetVisible(true);
+        }
+        SetPlanesVisible(true);
+        OnPlacementReset?.Invoke();
     }
 
     private void SetPlanesVisible(bool visible)

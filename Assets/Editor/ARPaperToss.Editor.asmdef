@@ -8,7 +8,9 @@
         "Unity.XR.ARKit.Editor",
         "Unity.XR.ARFoundation",
         "Unity.XR.CoreUtils",
-        "Unity.XR.CoreUtils.Editor"
+        "Unity.XR.CoreUtils.Editor",
+        "Unity.TextMeshPro",
+        "Unity.TextMeshPro.Editor"
     ],
     "includePlatforms": [
         "Editor"
