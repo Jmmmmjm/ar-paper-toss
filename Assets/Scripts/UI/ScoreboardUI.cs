@@ -27,8 +27,13 @@ public class ScoreboardUI : MonoBehaviour
     private int _currentScore = 0;
     private int _currentStreak = 0;
     private int _bestScore = 0;
+    private int _lastScoredThrowId = -1;
+    private int _lastLaunchedThrowId = -1;
     private Coroutine _popupCoroutine;
     private Coroutine _scorePunchCoroutine;
+
+    public int CurrentStreak => _currentStreak;
+    public int CurrentScore => _currentScore;
 
     private const string BestScorePrefKey = "AR_PaperToss_BestScore";
 
@@ -37,10 +42,26 @@ public class ScoreboardUI : MonoBehaviour
         _bestScore = PlayerPrefs.GetInt(BestScorePrefKey, 0);
         UpdateDisplay();
 
-        // Ensure ScoreboardPanel has SafeArea component attached to avoid Dynamic Island / notch
-        if (_scoreboardPanel != null && _scoreboardPanel.GetComponent<SafeArea>() == null)
+        // Auto-find references if not assigned in inspector
+        if (_scoreboardPanel == null)
+            _scoreboardPanel = GameObject.Find("ScoreboardPanel");
+
+        if (_scoreboardPanel != null)
         {
-            _scoreboardPanel.AddComponent<SafeArea>();
+            if (_scoreboardPanel.GetComponent<SafeArea>() == null)
+                _scoreboardPanel.AddComponent<SafeArea>();
+
+            if (_refreshButton == null)
+            {
+                var refBtnObj = _scoreboardPanel.transform.Find("RefreshButton");
+                if (refBtnObj != null) _refreshButton = refBtnObj.GetComponent<Button>();
+            }
+
+            if (_settingsButton == null)
+            {
+                var setBtnObj = _scoreboardPanel.transform.Find("SettingsButton");
+                if (setBtnObj != null) _settingsButton = setBtnObj.GetComponent<Button>();
+            }
         }
 
         if (_popupText != null)
@@ -50,21 +71,31 @@ public class ScoreboardUI : MonoBehaviour
     private void OnEnable()
     {
         ScoreTrigger.OnSuccessfulScore += HandleScore;
-        PaperBall.OnBallLanded += HandleBallLanded;
+        PaperBall.OnBallScored += HandleBallScored;
+        PaperBall.OnBallMissed += HandleBallMissed;
+        PaperBall.OnBallLaunched += HandleBallLaunched;
         PlacementController.OnTrashCanPlaced += HandleCanPlaced;
         SettingsManager.OnHighScoreReset += HandleHighScoreReset;
 
         if (_refreshButton != null)
+        {
+            _refreshButton.onClick.RemoveListener(RefreshGame);
             _refreshButton.onClick.AddListener(RefreshGame);
+        }
 
         if (_settingsButton != null)
+        {
+            _settingsButton.onClick.RemoveListener(OpenSettings);
             _settingsButton.onClick.AddListener(OpenSettings);
+        }
     }
 
     private void OnDisable()
     {
         ScoreTrigger.OnSuccessfulScore -= HandleScore;
-        PaperBall.OnBallLanded -= HandleBallLanded;
+        PaperBall.OnBallScored -= HandleBallScored;
+        PaperBall.OnBallMissed -= HandleBallMissed;
+        PaperBall.OnBallLaunched -= HandleBallLaunched;
         PlacementController.OnTrashCanPlaced -= HandleCanPlaced;
         SettingsManager.OnHighScoreReset -= HandleHighScoreReset;
 
@@ -176,17 +207,35 @@ public class ScoreboardUI : MonoBehaviour
         ShowPopup(popupMsg, popupColor);
     }
 
-    private void HandleBallLanded(PaperBall ball)
+    private void HandleBallScored(PaperBall ball)
     {
-        // If the ball landed without scoring, reset streak
-        if (ball != null && !ball.HasScored)
+        if (ball != null)
         {
-            if (_currentStreak > 0)
-            {
-                _currentStreak = 0;
-                UpdateDisplay();
-                ShowPopup("[ MISS! ]", new Color(1f, 0.25f, 0.35f, 1f));
-            }
+            _lastScoredThrowId = ball.ThrowId;
+        }
+    }
+
+    private void HandleBallLaunched(PaperBall ball)
+    {
+        if (ball != null)
+        {
+            _lastLaunchedThrowId = ball.ThrowId;
+        }
+    }
+
+    private void HandleBallMissed(PaperBall ball)
+    {
+        if (ball == null || ball.HasScored) return;
+
+        // If this miss was thrown BEFORE our latest basket, IGNORE IT!
+        // (Prevents a delayed miss timer from wiping a fresh score made right after)
+        if (ball.ThrowId < _lastScoredThrowId) return;
+
+        if (_currentStreak > 0)
+        {
+            _currentStreak = 0;
+            UpdateDisplay();
+            ShowPopup("[ MISS! ]", new Color(1f, 0.25f, 0.35f, 1f));
         }
     }
 

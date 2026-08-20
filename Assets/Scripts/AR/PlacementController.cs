@@ -92,13 +92,27 @@ public class PlacementController : MonoBehaviour
 
         bool foundHit = false;
 
-        // 1. Try AR Raycast (AR Foundation planes)
-        if (_raycastManager != null && _raycastManager.Raycast(screenPoint, _hits, _planeTypes) && _hits.Count > 0)
+        // 1. Try AR Raycast (Filter for horizontal surfaces only - reject vertical walls)
+        if (_raycastManager != null && _raycastManager.Raycast(screenPoint, _hits, TrackableType.PlaneWithinPolygon | TrackableType.PlaneEstimated) && _hits.Count > 0)
         {
-            Pose hitPose = _hits[0].pose;
-            _currentHitPosition = hitPose.position;
-            _currentHitRotation = hitPose.rotation;
-            foundHit = true;
+            foreach (var hit in _hits)
+            {
+                if (_planeManager != null)
+                {
+                    ARPlane plane = _planeManager.GetPlane(hit.trackableId);
+                    if (plane != null && plane.alignment != PlaneAlignment.HorizontalUp)
+                        continue;
+                }
+
+                Pose hitPose = hit.pose;
+                if (Vector3.Dot(hitPose.up, Vector3.up) > 0.6f)
+                {
+                    _currentHitPosition = hitPose.position;
+                    _currentHitRotation = hitPose.rotation;
+                    foundHit = true;
+                    break;
+                }
+            }
         }
 
         // 2. Physics Raycast fallback across ALL loaded scenes and PhysicsScenes (including XR Simulation environment scene)
@@ -134,14 +148,11 @@ public class PlacementController : MonoBehaviour
 
             foreach (var physHit in allHits)
             {
-                // Accept horizontal surfaces (floors, shelves, table tops, desks)
-                if (Mathf.Abs(Vector3.Dot(physHit.normal, Vector3.up)) > 0.3f)
+                // Only accept upward horizontal surfaces (floors, shelves, table tops, desks), reject vertical walls
+                if (Vector3.Dot(physHit.normal, Vector3.up) > 0.7f)
                 {
                     _currentHitPosition = physHit.point;
-                    Vector3 surfaceNormal = Vector3.Dot(physHit.normal, Vector3.up) >= 0f
-                        ? physHit.normal
-                        : -physHit.normal;
-                    _currentHitRotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
+                    _currentHitRotation = Quaternion.FromToRotation(Vector3.up, physHit.normal);
                     foundHit = true;
                     break;
                 }

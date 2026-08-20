@@ -24,16 +24,26 @@ public class PaperBall : MonoBehaviour
     private float _flightTime = 0f;
     private Vector3 _flutterNoiseOffset;
 
+    private static int _globalThrowCounter = 0;
+    private int _throwId = 0;
+
     public bool IsInFlight => _isInFlight;
     public bool HasScored => _hasScored;
+    public int ThrowId => _throwId;
 
     public static event Action<PaperBall> OnBallLaunched;
     public static event Action<PaperBall> OnBallLanded;
     public static event Action<PaperBall> OnBallScored;
+    public static event Action<PaperBall> OnBallMissed;
 
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();
+        if (_rb != null)
+        {
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            _rb.interpolation = RigidbodyInterpolation.Interpolate;
+        }
         _flutterNoiseOffset = new Vector3(UnityEngine.Random.value * 100f, UnityEngine.Random.value * 100f, UnityEngine.Random.value * 100f);
     }
 
@@ -42,10 +52,13 @@ public class PaperBall : MonoBehaviour
     /// </summary>
     public void Launch(Vector3 velocity, Vector3 torque)
     {
+        _throwId = ++_globalThrowCounter;
         _isInFlight = true;
         _flightTime = 0f;
         _rb.isKinematic = false;
         _rb.useGravity = true;
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        _rb.interpolation = RigidbodyInterpolation.Interpolate;
 
         // Use VelocityChange so launch speed is directly in m/s regardless of mass
         _rb.AddForce(velocity, ForceMode.VelocityChange);
@@ -65,6 +78,11 @@ public class PaperBall : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (!_isInFlight) return;
+
+        // Anti-tunneling sweep against thin or single-sided mesh walls
+        PreventTunneling();
+
         if (!_isInFlight) return;
 
         _flightTime += Time.fixedDeltaTime;
@@ -92,6 +110,46 @@ public class PaperBall : MonoBehaviour
             Vector3 windForce = WindManager.Instance.CurrentWindVector;
             _rb.AddForce(windForce, ForceMode.Force);
         }
+
+        // 4. Low-speed settling once landed: real paper balls don't roll endlessly
+        if (!_isInFlight && _rb != null)
+        {
+            if (_rb.linearVelocity.sqrMagnitude < 0.04f)
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+        }
+    }
+
+    private void PreventTunneling()
+    {
+        if (_rb == null) return;
+
+        Vector3 vel = _rb.linearVelocity;
+        float stepDist = vel.magnitude * Time.fixedDeltaTime;
+        if (stepDist > 0.005f)
+        {
+            float radius = transform.lossyScale.x * 0.5f; // Ball radius in world space (~0.04m)
+            if (Physics.SphereCast(transform.position, radius * 0.85f, vel.normalized, out RaycastHit hit, stepDist + 0.02f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (!hit.collider.isTrigger)
+                {
+                    transform.position = hit.point + hit.normal * (radius + 0.005f);
+                    // Inelastic paper absorption on impact: dead thud with 20% bounce
+                    _rb.linearVelocity = Vector3.Reflect(vel, hit.normal) * 0.20f;
+                    ApplyLandingDamping();
+                    _isInFlight = false;
+
+                    if (VFXManager.Instance != null && vel.magnitude > 0.6f)
+                        VFXManager.Instance.PlayImpactPoof(hit.point, hit.normal, vel.magnitude);
+
+                    OnBallLanded?.Invoke(this);
+                    StartCoroutine(EvaluateScoreOrMissRoutine());
+                    Destroy(gameObject, _autoDestroyDelay);
+                }
+            }
+        }
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -99,12 +157,48 @@ public class PaperBall : MonoBehaviour
         if (!_isInFlight) return;
 
         _isInFlight = false;
+
+        float impactSpeed = collision.relativeVelocity.magnitude;
+        if (VFXManager.Instance != null && collision.contactCount > 0 && impactSpeed > 0.6f)
+        {
+            ContactPoint contact = collision.GetContact(0);
+            VFXManager.Instance.PlayImpactPoof(contact.point, contact.normal, impactSpeed);
+        }
+
         OnBallLanded?.Invoke(this);
 
-        // Crumpled paper energy absorption: dampen angular spin on first contact
-        _rb.angularVelocity *= 0.35f;
+        // Real crumpled paper absorbs 75%+ of kinetic energy upon impact (dead thud)
+        _rb.linearVelocity *= 0.25f;
+        ApplyLandingDamping();
 
+        StartCoroutine(EvaluateScoreOrMissRoutine());
         Destroy(gameObject, _autoDestroyDelay);
+    }
+
+    private System.Collections.IEnumerator EvaluateScoreOrMissRoutine()
+    {
+        // Give 1.5 seconds grace period for rim rolls, bounces, and bank shots to drop in
+        float timer = 0f;
+        while (timer < 1.5f)
+        {
+            if (_hasScored) yield break; // Made the basket! Don't trigger miss
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!_hasScored)
+        {
+            OnBallMissed?.Invoke(this);
+        }
+    }
+
+    private void ApplyLandingDamping()
+    {
+        if (_rb == null) return;
+        // Crumpled paper facets catch the floor: heavy rolling & linear resistance
+        _rb.linearDamping = 3.5f;
+        _rb.angularDamping = 7.0f;
+        _rb.angularVelocity *= 0.15f;
     }
 
     public void MarkScored()
