@@ -171,7 +171,7 @@ public class PaperBallLauncher : MonoBehaviour
 #if UNITY_EDITOR
             if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return;
 #else
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+            if (Touchscreen.current != null)
             {
                 int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
                 if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId)) return;
@@ -191,11 +191,19 @@ public class PaperBallLauncher : MonoBehaviour
             pointerPos = Mouse.current.position.ReadValue();
         }
 #else
-        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+        // NOTE: wasReleasedThisFrame is true the frame the finger lifts,
+        // which is the SAME frame isPressed becomes false.
+        // We must NOT gate the whole read behind isPressed or we miss the release.
+        if (Touchscreen.current != null)
         {
-            pointerDown = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
-            pointerUp = Touchscreen.current.primaryTouch.press.wasReleasedThisFrame;
-            pointerPos = Touchscreen.current.primaryTouch.position.ReadValue();
+            var touch = Touchscreen.current.primaryTouch;
+            pointerDown = touch.press.wasPressedThisFrame;
+            pointerUp   = touch.press.wasReleasedThisFrame;
+            // Only update position while the finger is down (or just released this frame)
+            if (touch.press.isPressed || pointerUp || pointerDown)
+            {
+                pointerPos = touch.position.ReadValue();
+            }
         }
 #endif
 
