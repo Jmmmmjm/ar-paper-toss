@@ -15,7 +15,7 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Unity License
+      - name: Setup Unity Entitlement License
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         run: |
@@ -37,14 +37,11 @@ jobs:
 
       - name: Build Unity iOS Xcode Project
         uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: iOS
           unityVersion: 6000.1.6f1
           buildsPath: build
+          skipActivation: true
 
       - name: Package Xcode to Unsigned IPA
         run: |
