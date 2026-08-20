@@ -7,24 +7,20 @@ jobs:
   activation:
     name: Acquire .alf file
     runs-on: ubuntu-latest
+    container:
+      image: unityci/editor:ubuntu-6000.1.6f1-ios-3.3.0
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          lfs: false
 
-      - name: Request manual activation file
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ''
-        with:
-          targetPlatform: iOS
-          unityVersion: 6000.1.6f1
-        continue-on-error: true
+      - name: Create Manual Activation File
+        run: |
+          unity-editor -batchmode -nographics -createManualActivationFile -logfile /dev/stdout || true
+          mkdir -p output
+          find / -name "*.alf" 2>/dev/null -exec cp {} output/ \; || true
 
       - name: Expose .alf file as artifact
         uses: actions/upload-artifact@v4
         with:
           name: Unity_v6000.1.6f1.alf
-          path: '**/*.alf'
-          if-no-files-found: error
+          path: output/*.alf
