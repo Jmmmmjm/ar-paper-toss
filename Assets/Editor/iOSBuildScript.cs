@@ -27,10 +27,10 @@ public static class iOSBuildScript
 
         // 2. Configure PlayerSettings for iOS
         PlayerSettings.iOS.cameraUsageDescription = "Camera is required for AR surface tracking and paper toss gameplay.";
-        PlayerSettings.SetArchitecture(NamedBuildTarget.iOS, 1); // 1 = ARM64
+        PlayerSettings.SetArchitecture(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.iOS), 1); // 1 = ARM64
         PlayerSettings.iOS.targetOSVersionString = "15.0";
         PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
-        PlayerSettings.SetScriptingBackend(NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
+        PlayerSettings.SetScriptingBackend(NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.iOS), ScriptingImplementation.IL2CPP);
 
         // 3. Initialize & Configure XR Plug-in Management for iOS
         var buildTargetSettings = XRGeneralSettingsPerBuildTarget.GetOrCreate();
